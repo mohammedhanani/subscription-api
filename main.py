@@ -4,7 +4,6 @@ import requests
 
 app = Flask(__name__)
 
-# رابط Google Apps Script الخاص فيك
 GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxh0on2M4HGic5la6SglAh6cW3uVyos9mUn6gp7FvVwoviSkWO2qw0kumXeRYcGOBjlew/exec"
 
 @app.route('/check', methods=['POST'])
@@ -16,18 +15,23 @@ def check_subscription():
         return jsonify({"status": "error", "message": "email is required"}), 400
 
     try:
-        # نطلب البيانات من Google Sheets
-        response = requests.get(GOOGLE_SCRIPT_URL, params={"email": email})
-        result = response.json()
+        # نطلب كل البيانات من Google Sheets
+        response = requests.get(GOOGLE_SCRIPT_URL)
+        sheet_data = response.json()
 
-        if "error" in result:
-            return jsonify({"status": "not_found"}), 404
+        for entry in sheet_data:
+            if entry.get("email", "").lower() == email.lower():
+                expiry_str = entry.get("subscription_until", "")
+                try:
+                    expiry = datetime.strptime(expiry_str, "%Y-%m-%d")
+                    if expiry >= datetime.now():
+                        return jsonify({"status": "active"}), 200
+                    else:
+                        return jsonify({"status": "expired"}), 403
+                except:
+                    return jsonify({"status": "error", "message": "Invalid date format"}), 500
 
-        expiry = datetime.strptime(result["subscription_until"], "%Y-%m-%d")
-        if expiry >= datetime.now():
-            return jsonify({"status": "active"}), 200
-        else:
-            return jsonify({"status": "expired"}), 403
+        return jsonify({"status": "not_found"}), 404
 
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
@@ -36,6 +40,5 @@ def check_subscription():
 def home():
     return "Subscription API Connected to Google Sheets ✅"
 
-# حل مشكلة السيرفر في Render
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
