@@ -1,43 +1,34 @@
+import firebase_admin
+from firebase_admin import credentials, firestore
 from flask import Flask, request, jsonify
-from datetime import datetime
-import requests
+
+# Initialize Firebase
+cred = credentials.Certificate('path/to/your/serviceAccountKey.json')
+firebase_admin.initialize_app(cred)
+
+# Initialize Firestore DB
+db = firestore.client()
 
 app = Flask(__name__)
 
-GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyOcLAjMPqoayVmmMdkwQeyiX6fY_i5HwjoOToUAzL8bI0Ek8JcHN4oJq9hxldXkBsAlA/exec"
-
 @app.route('/check', methods=['POST'])
 def check_subscription():
-    data = request.json
-    email = data.get("email")
+    data = request.get_json()
+    email = data.get('email')
 
-    if not email:
-        return jsonify({"status": "error", "message": "email is required"}), 400
+    # Fetch the user document from Firestore
+    users_ref = db.collection('subscriptions')
+    user_doc = users_ref.document(email).get()
 
-    try:
-        response = requests.get(GOOGLE_SCRIPT_URL, params={"email": email})
-
-        # ✅ اطبع الرد الكامل من Google Script
-        print("RAW Google Script Response:", response.text, flush=True)
-
-        result = response.json()
-
-        if "error" in result:
-            return jsonify({"status": "not_found"}), 404
-
-        expiry = datetime.strptime(result["subscription_until"], "%Y-%m-%d")
-        if expiry >= datetime.now():
-            return jsonify({"status": "active"}), 200
+    if user_doc.exists:
+        user_data = user_doc.to_dict()
+        subscription_until = user_data.get('subscription_until')
+        if subscription_until:
+            return jsonify({"status": "success", "subscription_until": subscription_until})
         else:
-            return jsonify({"status": "expired"}), 403
+            return jsonify({"status": "error", "message": "No subscription date found"})
+    else:
+        return jsonify({"status": "error", "message": "Email not found"})
 
-    except Exception as e:
-        print("🔥 ERROR:", str(e), flush=True)
-        return jsonify({"status": "error", "message": str(e)}), 500
-
-@app.route('/')
-def home():
-    return "Subscription API Connected to Google Sheets ✅"
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8000)
+if __name__ == '__main__':
+    app.run(debug=True)
