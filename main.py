@@ -4,7 +4,7 @@ import requests
 
 app = Flask(__name__)
 
-GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxh0on2M4HGic5la6SglAh6cW3uVyos9mUn6gp7FvVwoviSkWO2qw0kumXeRYcGOBjlew/exec"
+GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyMnHdyRv7RbCuFagEYojeGmPRVymd490K527ZOnfZP13AyAC0abKLhzOMJzwBiB5nuwA/exec"
 
 @app.route('/check', methods=['POST'])
 def check_subscription():
