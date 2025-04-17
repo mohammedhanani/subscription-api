@@ -1,34 +1,37 @@
+from flask import Flask, request, jsonify
 import firebase_admin
 from firebase_admin import credentials, firestore
-from flask import Flask, request, jsonify
-
-# Initialize Firebase
-cred = credentials.Certificate('path/to/your/serviceAccountKey.json')
-firebase_admin.initialize_app(cred)
-
-# Initialize Firestore DB
-db = firestore.client()
+from datetime import datetime
 
 app = Flask(__name__)
 
-@app.route('/check', methods=['POST'])
+# مسار ملف الخدمة من Firebase (لازم تكون حملته من Console)
+cred = credentials.Certificate("firebase_service_account.json")
+firebase_admin.initialize_app(cred)
+
+db = firestore.client()
+
+@app.route("/check", methods=["POST"])
 def check_subscription():
     data = request.get_json()
-    email = data.get('email')
+    email = data.get("email")
 
-    # Fetch the user document from Firestore
-    users_ref = db.collection('subscriptions')
-    user_doc = users_ref.document(email).get()
+    if not email:
+        return jsonify({"error": "Email is required"}), 400
 
-    if user_doc.exists:
-        user_data = user_doc.to_dict()
-        subscription_until = user_data.get('subscription_until')
-        if subscription_until:
-            return jsonify({"status": "success", "subscription_until": subscription_until})
+    doc_ref = db.collection("subscriptions").document(email)
+    doc = doc_ref.get()
+
+    if doc.exists:
+        sub_data = doc.to_dict()
+        subscription_until = sub_data.get("subscription_until")
+
+        if subscription_until and subscription_until > datetime.now():
+            return jsonify({"status": "active"})
         else:
-            return jsonify({"status": "error", "message": "No subscription date found"})
+            return jsonify({"status": "expired"})
     else:
-        return jsonify({"status": "error", "message": "Email not found"})
+        return jsonify({"status": "not_found"})
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     app.run(debug=True)
